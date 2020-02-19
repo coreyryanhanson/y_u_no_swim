@@ -13,14 +13,15 @@ class Activity(object):
 
     #Function containing the outputs in the event of given errors (to be overridden if using GUI).
     def _errors(self, arg, required_extension=None):
-        msg = {"filepath_str": "Error-filepath is not a string.",
+        self.error_msg = {"filepath_str": "Error-filepath is not a string.",
+               "input_float": "Error-you need to input a number",
                "wrong_filepath": "Error file does not exist. Make sure to specify the correct path.",
                "missing_path": "Error path does not exist. Make sure to specify the correct path.",
                "no_extension":"Error file has no extension.",
                "wrong_extension": f"Error file extension must be {required_extension}",
                "need_overwrite": "Error, the file exists and you haven't given permission to overwrite it. Choose another filename.",
                "missing_activity": "Error, activity does not exist."}
-        print(msg[arg])
+        print(self.error_msg[arg])
 
     #Verifies that filepath is a string
     def _try_filepath_string(self, filepath):
@@ -87,14 +88,22 @@ class Activity(object):
         else:
             self._save_file(filepath, self.output)
 
-    #Registers the xml namespaces if they exist
+    # Registers the xml namespaces if they exist
     def _register_namespaces(self):
         namespaces = [node for _, node in ET.iterparse(self.filepath, events=['start-ns'])]
         for namespace in namespaces:
             ET.register_namespace(namespace[0], namespace[1])
+        self.namespaces = {namespace[0]: namespace[1] for namespace in namespaces}
+        self.default_namespace = "{" + self.namespaces[""] + "}"
 
     def _get_laps(self):
-        return list(self.activity.findall("lap"))
+        self.activ_tag = self.activity.find(".//" + self.default_namespace + "Activity")
+        self.lap_data = self.activ_tag.findall(".//" + self.default_namespace + "Lap")
+        self.total_laps = len(self.lap_data)
+
+    def _add_lap_distance(self):
+        for i, lap in enumerate(self.lap_data):
+            print(i, lap)
 
     #Standardizes and parses the text with minidom for cleaner output.
     def _mini_parse(self):
@@ -110,7 +119,21 @@ class Activity(object):
             self._register_namespaces()
             self.tree = tree
             self.activity = self.tree.getroot()
+            self._get_laps()
 
+    def set_pool_length(self, pool_length):
+        if self.activity == None:
+            self._errors("missing_activity")
+            return
+        else:
+            try:
+                lap_distance = float(pool_length)
+            except:
+                self._errors("input_float")
+                return
+            else:
+                self.lap_distance = lap_distance
+                self._add_lap_distance()
 
     def to_xml(self, filepath=None, print_xml=True, overwrite=False):
         if self.activity == None:
