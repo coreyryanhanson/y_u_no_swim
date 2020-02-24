@@ -91,30 +91,28 @@ class Activity(object):
 
     # Registers the xml namespaces if they exist
     def _register_namespaces(self):
-        namespaces = [node for _, node in ET.iterparse(self.filepath, events=['start-ns'])]
-        for namespace in namespaces:
-            ET.register_namespace(namespace[0], namespace[1])
-        self.namespaces = {namespace[0]: namespace[1] for namespace in namespaces}
-        self.default_namespace = "{" + self.namespaces[""] + "}"
+        self.namespaces = {node[0]: node[1] for _, node in ET.iterparse(self.filepath, events=['start-ns'])}
+        for key, value in self.namespaces.items():
+            ET.register_namespace(key, value)
+        self.default_ns = "{" + self.namespaces[""] + "}"
 
     def _get_laps(self):
-        self.activ_tag = self.activity.find(".//" + self.default_namespace + "Activity")
-        self.lap_data = self.activ_tag.findall(".//" + self.default_namespace + "Lap")
+        self.activ_tag = self.activity.find(".//" + self.default_ns + "Activity")
+        self.lap_data = self.activ_tag.findall(".//" + self.default_ns + "Lap")
         self.total_laps = len(self.lap_data)
 
     def _extract_time(self, element, tag_name ="Time", format='%Y-%m-%dT%H:%M:%S.%fZ'):
-        return dt.datetime.strptime(element.find("." + self.default_namespace + tag_name).text, format)
+        return dt.datetime.strptime(element.find("." + self.default_ns + tag_name).text, format)
 
     def _update_item_text(self, item, tag_name, text):
-        tag = item.find("." + self.default_namespace + tag_name)
+        tag = item.find("." + self.default_ns + tag_name)
         if tag == None:
             tag = ET.SubElement(item, tag_name)
-        else:
-            pass
         tag.text = text
+        return text
 
     def _update_lap_trackpoints(self, lap, current_dist):
-        default_ns = self.default_namespace
+        default_ns = self.default_ns
         trackpoints = lap.findall("." + default_ns + "Track/"+ default_ns +"Trackpoint")
         start_time, end_time = self._extract_time(trackpoints[0]), self._extract_time(trackpoints[-1])
         time_span = (end_time - start_time).total_seconds()
