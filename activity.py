@@ -3,6 +3,7 @@
 import os
 import xml.etree.ElementTree as ET
 import xml.dom.minidom as minidom
+import datetime as dt
 
 
 
@@ -101,9 +102,35 @@ class Activity(object):
         self.lap_data = self.activ_tag.findall(".//" + self.default_namespace + "Lap")
         self.total_laps = len(self.lap_data)
 
-    def _add_lap_distance(self):
+    def _extract_time(self, element, tag_name ="Time", format='%Y-%m-%dT%H:%M:%S.%fZ'):
+        return dt.datetime.strptime(element.find("." + self.default_namespace + tag_name).text, format)
+
+    def _update_item_text(self, item, tag_name, text):
+        tag = item.find("." + self.default_namespace + tag_name)
+        if tag == None:
+            tag = ET.SubElement(item, tag_name)
+        else:
+            pass
+        tag.text = text
+
+    def _update_lap_trackpoints(self, lap, current_dist):
+        default_ns = self.default_namespace
+        trackpoints = lap.findall("." + default_ns + "Track/"+ default_ns +"Trackpoint")
+        start_time, end_time = self._extract_time(trackpoints[0]), self._extract_time(trackpoints[-1])
+        time_span = (end_time - start_time).total_seconds()
+        for trackpoint in trackpoints:
+            current_time = self._extract_time(trackpoint)
+            time_proportion = (current_time- start_time).total_seconds()/time_span
+            progress = current_dist + time_proportion * self.lap_distance
+            progress_formatted =  f"{progress:.1f}"
+            self._update_item_text(trackpoint, "DistanceMeters", progress_formatted)
+
+    def _update_laps(self, current_dist=0):
+        distance_formatted = f"{self.lap_distance:.1f}"
         for i, lap in enumerate(self.lap_data):
-            print(i, lap)
+            self._update_item_text(lap, "DistanceMeters", distance_formatted)
+            self._update_lap_trackpoints(lap, current_dist)
+            current_dist += self.lap_distance
 
     #Standardizes and parses the text with minidom for cleaner output.
     def _mini_parse(self):
@@ -133,7 +160,7 @@ class Activity(object):
                 return
             else:
                 self.lap_distance = lap_distance
-                self._add_lap_distance()
+                self._update_laps()
 
     def to_xml(self, filepath=None, print_xml=True, overwrite=False):
         if self.activity == None:
