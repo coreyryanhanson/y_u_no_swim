@@ -6,11 +6,11 @@ import xml.dom.minidom as minidom
 import datetime as dt
 
 
-
 class Activity(object):
-    def __init__(self, filepath):
+    def __init__(self, print_xml=False):
         self.activity = None
-        self.load_tcx(filepath)
+        self.print_xml = print_xml
+        self._user_prompts()
 
     #Function containing the outputs in the event of given errors (to be overridden if using GUI).
     def _errors(self, arg, required_extension=None):
@@ -26,7 +26,9 @@ class Activity(object):
 
     #Verifies that filepath is a string
     def _try_filepath_string(self, filepath):
-        if type(filepath) == str:
+        if filepath == "":
+            return None
+        elif type(filepath) == str:
             self.filepath = filepath
             return filepath
         else:
@@ -50,7 +52,7 @@ class Activity(object):
     #Checks to see if file exists and that it matches the correct file extension before loading it.
     def _load_file(self, filepath, required_extension):
         filename, file_extension = self._file_extension_extract(filepath)
-        if file_extension != required_extension:
+        if file_extension.lower() != required_extension:
             self._errors("wrong_extension", required_extension)
             return
         elif not os.path.exists(filepath):
@@ -68,13 +70,15 @@ class Activity(object):
         with open(tmp, "w") as f:
             output.writexml(f, indent="\t", addindent="\t", newl="\n")
         os.replace(tmp, new_file)
+        # print(tmp)
+        # print(new_file)
 
     def _export_to_file(self, filepath=None, overwrite=False):
         if filepath == None:
             filepath = self.filepath
         else:
             filepath = self._try_filepath_string(filepath)
-        if filepath == False:
+        if filepath is False:
             return
         else:
             path, file = os.path.split(filepath)
@@ -88,6 +92,47 @@ class Activity(object):
             return
         else:
             self._save_file(filepath, self.output)
+
+    def _user_prompts(self):
+        self._input_file_prompt()
+        self._input_pool_length_prompt()
+        self._output_file_prompt()
+
+    def _input_file_prompt(self):
+        print("Enter filepath to tcx file")
+        raw_filepath = input()
+        self.load_tcx(raw_filepath)
+        if self.activity:
+            return
+        else:
+            return self._input_file_prompt()
+
+    def _input_pool_length_prompt(self):
+        print("Enter pool length (in meters)")
+        pool_length_input = input()
+        result = self.set_pool_length(pool_length_input)
+        if result == False:
+            return self._input_pool_length_prompt()
+        else:
+            return
+
+    def _output_file_prompt(self):
+        print("Enter a filepath to save to. (Leave blank if you want to replace the existing file)")
+        raw_filepath = input()
+        raw_filepath = self._try_filepath_string(raw_filepath)
+        if raw_filepath == False:
+            return self._output_file_prompt()
+        else:
+            overwrite = self._overwrite_file_prompt()
+        self.to_xml(raw_filepath, overwrite)
+
+    def _overwrite_file_prompt(self):
+        print("Overwrite? Enter y for yes.")
+        overwrite_response = input()
+        if overwrite_response == "y" or overwrite_response == "yes":
+            return True
+        else:
+            return False
 
     # Registers the xml namespaces if they exist
     def _register_namespaces(self):
@@ -149,24 +194,31 @@ class Activity(object):
     def set_pool_length(self, pool_length):
         if self.activity == None:
             self._errors("missing_activity")
-            return
+            return False
         else:
             try:
                 lap_distance = float(pool_length)
             except:
                 self._errors("input_float")
-                return
+                return False
             else:
                 self.lap_distance = lap_distance
                 self._update_laps()
+                return True
 
-    def to_xml(self, filepath=None, print_xml=True, overwrite=False):
+    def to_xml(self, filepath=None, overwrite=False):
         if self.activity == None:
             self._errors("missing_activity")
             return
         else:
             self._mini_parse()
+        if self.print_xml is True:
             print(self.output.toprettyxml(indent="\t"))
-            self._export_to_file(filepath, overwrite=overwrite)
+        self._export_to_file(filepath, overwrite=overwrite)
 
 
+def main():
+    Activity()
+
+
+if __name__ == '__main__': main()
